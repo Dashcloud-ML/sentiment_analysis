@@ -1,4 +1,4 @@
-# stock_sentimenta
+
 # 📈 Dristikon AI
 ### AI-Powered Financial News & Sentiment Analysis Platform
 
