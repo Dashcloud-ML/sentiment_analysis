@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SentimentChart from '../components/SentimentChart'; // Adjust the import based on your file structure
 import axios from 'axios';
+import { API_BASE_URL } from "../config/api";
 
 const Sentiment = () => {
   const [stock, setStock] = useState('');
@@ -15,7 +16,7 @@ const Sentiment = () => {
   const handleAnalyzeClick = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/news/${stock}`);
+      const response = await axios.get(`${API_BASE_URL}/news/${stock}`);
       const data = response.data;
       setNewsData(data.data.articles);
 

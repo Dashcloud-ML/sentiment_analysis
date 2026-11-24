@@ -110,6 +110,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { API_BASE_URL } from "../config/api";
 
 // MessageBox component for displaying messages
 const MessageBox = ({ message, isAI }) => {
@@ -136,7 +137,7 @@ const ChatbotComponent = () => {
         setLoading(true);
 
         try {
-            const res = await fetch("http://127.0.0.1:5000/bot/ask-ai", {
+            const res = await fetch(`${API_BASE_URL}/bot/ask-ai`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query }),

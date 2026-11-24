@@ -173,6 +173,7 @@ import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { motion } from "framer-motion";
 import loadingGif from "../assets/images/loading1.gif";
+import { API_BASE_URL } from "../config/api";
 
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -192,7 +193,7 @@ export default function NewsFeed() {
     setSummary(""); 
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/news/${ticker}`);
+      const response = await fetch(`${API_BASE_URL}/news/${ticker}`);
       const data = await response.json();
 
       if (data.status === "success") {
