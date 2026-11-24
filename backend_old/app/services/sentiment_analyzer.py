@@ -1,7 +1,10 @@
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
+from pathlib import Path
 from threading import Lock
+
+import numpy as np
+import onnxruntime as ort
+from tokenizers import Tokenizer
 
 
 class SentimentAnalyzer:
@@ -9,6 +12,15 @@ class SentimentAnalyzer:
     _instance = None
     _instance_lock = Lock()
     _model_lock = Lock()
+    _inference_lock = Lock()
+
+    MODEL_DIR = (
+        Path(__file__).resolve().parents[2]
+        / "models"
+        / "finbert"
+    )
+
+    LABELS = ["positive", "negative", "neutral"]
 
     def __new__(cls):
         with cls._instance_lock:
@@ -23,22 +35,34 @@ class SentimentAnalyzer:
         with self._model_lock:
             if self.model is None:
 
-                print("Loading FinBERT model...", flush=True)
+                print("Loading optimized FinBERT...", flush=True)
 
-                tokenizer = AutoTokenizer.from_pretrained(
-                    "ProsusAI/finbert"
+                tokenizer = Tokenizer.from_file(
+                    str(self.MODEL_DIR / "tokenizer.json")
                 )
 
-                model = AutoModelForSequenceClassification.from_pretrained(
-                    "ProsusAI/finbert"
-                )
+                tokenizer.enable_truncation(max_length=512)
 
-                model.eval()
+                options = ort.SessionOptions()
+
+                options.intra_op_num_threads = 1
+                options.inter_op_num_threads = 1
+                options.enable_cpu_mem_arena = False
+                options.enable_mem_pattern = False
+
+                model = ort.InferenceSession(
+                    str(self.MODEL_DIR / "model_int8.onnx"),
+                    sess_options=options,
+                    providers=["CPUExecutionProvider"]
+                )
 
                 self.tokenizer = tokenizer
                 self.model = model
 
-                print("FinBERT loaded successfully", flush=True)
+                print(
+                    "Optimized FinBERT loaded successfully",
+                    flush=True
+                )
 
     def analyze_sentiment(self, text):
 
@@ -55,31 +79,41 @@ class SentimentAnalyzer:
 
         self.load_model()
 
-        inputs = self.tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            padding=True,
-            max_length=512
-        )
+        with self._inference_lock:
 
-        with torch.inference_mode():
-            outputs = self.model(**inputs)
+            encoding = self.tokenizer.encode(text)
 
-            probabilities = torch.softmax(
-                outputs.logits,
-                dim=1
-            )[0]
+            inputs = {
+                "input_ids": np.array(
+                    [encoding.ids], dtype=np.int64
+                ),
+                "attention_mask": np.array(
+                    [encoding.attention_mask], dtype=np.int64
+                ),
+                "token_type_ids": np.array(
+                    [encoding.type_ids], dtype=np.int64
+                )
+            }
 
-        label_idx = probabilities.argmax().item()
+            onnx_inputs = {
+                item.name: inputs[item.name]
+                for item in self.model.get_inputs()
+            }
 
-        labels = self.model.config.id2label
+            logits = self.model.run(
+                None, onnx_inputs
+            )[0][0]
+
+            exp = np.exp(logits - np.max(logits))
+            probabilities = exp / exp.sum()
+
+        label_idx = int(np.argmax(probabilities))
 
         return {
-            "label": labels[label_idx].lower(),
-            "score": probabilities[label_idx].item(),
+            "label": self.LABELS[label_idx],
+            "score": float(probabilities[label_idx]),
             "scores": {
-                labels[i].lower(): score.item()
+                self.LABELS[i]: float(score)
                 for i, score in enumerate(probabilities)
             }
         }

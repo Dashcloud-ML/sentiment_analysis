@@ -8,6 +8,8 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+
 
 # Frontend
 node_modules/
@@ -19,3 +21,11 @@ chroma_db/
 
 # Logs
 *.log
+
+# Local ONNX conversion environment
+.onnx-env/
+
+# Locally generated FinBERT models
+backend_old/models/finbert/*.onnx
+backend_old/models/finbert/*.onnx.data
+backend_old/models/finbert/
